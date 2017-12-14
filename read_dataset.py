@@ -10,6 +10,11 @@ def print_size_info():
     print 'unseen_class_ids: ', unseen_class_ids.shape
     print 'umseen_attr_mat: ', unseen_attr_mat.shape
 
+def combine_splits(splits, split_idx):
+    # split_idx in [0, len(splits)-1]
+    train_split = [split for split in splits[]]
+    valid_split = splits[split_idx]
+
 #dataset_path = '.\\apascal'
 dataset_path = '.\\animals'
 #dataset_path = '.\\sun'
