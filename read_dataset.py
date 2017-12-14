@@ -12,8 +12,10 @@ def print_size_info():
 
 def combine_splits(splits, split_idx):
     # split_idx in [0, len(splits)-1]
-    train_split = [split for split in splits[]]
-    valid_split = splits[split_idx]
+    train_splits = [splits[idx] for idx in range(len(splits)) if idx != split_idx]
+    train_class_ids = [item for sublist in train_splits for item in sublist]
+    valid_class_ids = splits[split_idx]
+    return train_class_ids, valid_class_ids
 
 #dataset_path = '.\\apascal'
 dataset_path = '.\\animals'
@@ -42,7 +44,11 @@ splits = [class_indices[fold_idx:fold_idx+num_classes_per_fold] for fold_idx in 
 if len(splits[-1]) < num_classes_per_fold:
     splits[-2] += (splits[-1])
     del splits[-1]
-print splits
+
+print 'splits: \n', splits, '\n'
+train_class_ids, valid_class_ids = combine_splits(splits, 1)
+print 'train_class_ids: \n', train_class_ids, '\n'
+print 'valid_class_ids: \n', valid_class_ids, '\n'
 
 ## Unseen Data
 unseen_class_ids = data['unseen_class_ids']
