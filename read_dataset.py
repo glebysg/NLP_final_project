@@ -5,6 +5,7 @@ import random
 import math
 import argparse
 import torch
+import pickle
 
 # Example usage:
 # python read_dataset.py -p ./data/apascal/ -l 500000 -f 10
@@ -19,6 +20,10 @@ parser.add_argument("-l", "--lambda",
 parser.add_argument("-f", "--folds",
                     default=10,  type=int,
                     help=("full path to the dataset"))
+
+def save_object(obj, filename):
+        with open(filename, 'wb') as output:
+                    pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
 
 def print_size_info():
     print ('seen_class_ids: ', seen_class_ids.shape)
@@ -70,9 +75,6 @@ if len(splits[-1]) < num_classes_per_fold:
     splits[-2] += (splits[-1])
     del splits[-1]
 
-print ('splits: \n', splits, '\n')
-print ('train_class_ids: \n', train_class_ids, '\n')
-print ('valid_class_ids: \n', valid_class_ids, '\n')
 
 ## Unseen Data
 unseen_class_ids = data['unseen_class_ids']
@@ -88,8 +90,8 @@ for index in range(1):
     train_class_ids, valid_class_ids = combine_splits(splits, index)
     train_size = 0
     valid_size = 0
-    feature_size = seen_attr_mat.shape[1]
-    description_size = 0
+    description_size = seen_attr_mat.shape[1]
+    feature_size = 0
     train_classes_size = len(train_class_ids)
     valid_classes_size = len(valid_class_ids)
     for feat_in in fid['seen_input']:
@@ -99,22 +101,38 @@ for index in range(1):
     close_file_pointers('seen_input')
     refresh_file_pointers('seen_input','seen_data_input.dat',dataset_path)
     for feat_out in fid['seen_output']:
-        if feat_out in train_class_ids:
+        if int(feat_out) in train_class_ids:
             train_size += 1
-        if feat_out in valid_class_ids:
+        if int(feat_out) in valid_class_ids:
             valid_size += 1
     close_file_pointers('seen_output')
     refresh_file_pointers('seen_output','seen_data_output.dat',dataset_path)
     # Create the tensors
     train_t = torch.zeros(feature_size,train_size)
     semantic_t = torch.zeros(description_size,train_size)
+    print(description_size,train_size)
+    print(semantic_t)
     w_t = torch.zeros(description_size,feature_size)
-    print("THE TENSORS DID NOT EXPLODE")
+    seen_train_index = 0
+    for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
+        feat_out = int(feat_out)
+        feat_in_split = list(map(float,feat_in.split(',')))
+        if int(feat_out) in train_class_ids:
+            # print("train t size:", train_t[:,seen_train_index].size())
+            # print("train t receiving:", torch.FloatTensor(feat_in_split).size())
+            train_t[:,seen_train_index] = torch.FloatTensor(feat_in_split)
+            semantic_t[:,seen_train_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
+        seen_train_index += 1
 
+    A = torch.mm(semantic_t,semantic_t.t())
+    B = lambda_val*torch.mm(train_t,train_t.t())
+    C = (1 + lambda_val)*torch.mm(semantic_t,train_t.t())
 
-    exit()
-    val_t = torch.zeros(feature_size,valid_size)
-    val_semantic_t = torch.zeros(description_size,valid_size)
+    W = solve_sylvester(A.numpy(), B.numpy(), C.numpy())
+    save_object(W,'first_w')
+exit()
+    # val_t = torch.zeros(feature_size,valid_size)
+    # val_semantic_t = torch.zeros(description_size,valid_size)
 
 
 # M = torch.zeros(3, 2)
