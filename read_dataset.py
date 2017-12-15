@@ -6,9 +6,11 @@ import math
 import argparse
 import torch
 import pickle
+import time
+import numpy as np
 
 # Example usage:
-# python read_dataset.py -p ./data/apascal/ -l 500000 -f 10
+# python read_dataset.py -p ./data/apascal/ -l 500000 -f 10 -r 10f_apascal
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--dataset_path",
@@ -16,10 +18,13 @@ parser.add_argument("-p", "--dataset_path",
                     help=("full path to the dataset"))
 parser.add_argument("-l", "--lambda",
                     default=500000, type=float,
-                    help=("full path to the dataset"))
+                    help=("Lamda parameter"))
 parser.add_argument("-f", "--folds",
                     default=10,  type=int,
-                    help=("full path to the dataset"))
+                    help=("Number of folds for cross validation"))
+parser.add_argument("-r", "--r_name",
+                    required=True,
+                    help=("name of the pkl object to save the results"))
 
 def save_object(obj, filename):
         with open(filename, 'wb') as output:
@@ -46,6 +51,7 @@ args = vars(parser.parse_args())
 dataset_path = args['dataset_path']
 lambda_val = args['lambda']
 num_folds = args['folds']
+obj_name = args['r_name']
 #dataset_path = '.\\apascal'
 # dataset_path = '.\\animals'
 #dataset_path = '.\\sun'
@@ -84,7 +90,20 @@ fid_count['unseen'] = 0
 ## Count the dimentions of the training and validation folds
 # for index in range(len(train_class_ids)):
 for index in range(1):
+    # Combine the splits into training and validation
     train_class_ids, valid_class_ids = combine_splits(splits, index)
+
+    # Finding training and validation attribute matrix
+    train_attr_mat = []
+    valid_attr_mat = []
+    for class_id in train_class_ids:
+        train_attr_mat.append(seen_attr_mat[class_id,:])
+    train_attr_mat = np.array(train_attr_mat)
+    for class_id in valid_class_ids:
+        valid_attr_mat.append(seen_attr_mat[class_id,:])
+    valid_attr_mat = np.array(valid_attr_mat)
+
+    # 
     train_size = 0
     valid_size = 0
     description_size = seen_attr_mat.shape[1]
@@ -113,13 +132,16 @@ for index in range(1):
     refresh_file_pointers('seen_output','seen_data_output.dat',dataset_path)
     # Create the tensors
     train_t = torch.zeros(feature_size,train_size)
+    valid_t = torch.zeros(feature_size,valid_size)
     print ('train_t size', train_t)
-    semantic_t = torch.zeros(description_size,train_size)
+    train_semantic_t = torch.zeros(description_size,train_size)
+    valid_semantic_t = torch.zeros(description_size,valid_size)
     print('description_size,train_size', description_size,train_size)
-    print('semantic_t size: ', semantic_t)
+    print('train_semantic_t size: ', train_semantic_t)
     w_t = torch.zeros(description_size,feature_size)
     print()
     seen_train_index = 0
+    seen_valid_index = 0
     for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
         feat_out = int(feat_out) - 1 
         feat_in_split = list(map(float,feat_in.split(',')))
@@ -127,18 +149,50 @@ for index in range(1):
             # print("train t size:", train_t[:,seen_train_index].size())
             # print("train t receiving:", torch.FloatTensor(feat_in_split).size())
             train_t[:,seen_train_index] = torch.FloatTensor(feat_in_split)
-            semantic_t[:,seen_train_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
+            train_semantic_t[:,seen_train_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
             seen_train_index += 1
+        elif int(feat_out) in valid_class_ids:
+            valid_t[:,seen_valid_index] = torch.FloatTensor(feat_in_split)
+            valid_semantic_t[:,seen_valid_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
+            seen_valid_index += 1
+        else:
+            print("Error: class not present in list")
+            exit(1)           
 
-    A = torch.mm(semantic_t,semantic_t.t())
+    A = torch.mm(train_semantic_t,train_semantic_t.t())
     B = lambda_val*torch.mm(train_t,train_t.t())
-    C = (1 + lambda_val)*torch.mm(semantic_t,train_t.t())
+    C = (1 + lambda_val)*torch.mm(train_semantic_t,train_t.t())
+
+    start_time = time.time()
     print("Solving Sylvester")
     W = solve_sylvester(A.numpy(), B.numpy(), C.numpy())
-    save_object(W,'first_w')
+    print('Time taken solving: ', time.time()-start_time)
+    W = torch.FloatTensor(W)
+
+    ## Compute training error
+    train_semantic_pred = torch.mm(W, train_t)
+    _, train_pred_classes = torch.max(torch.mm(train_attr_mat.t(), train_semantic_pred), dim=0)
+    _, train_true_classes = torch.max(torch.mm(train_attr_mat.t(), train_semantic_t), dim=0)
+    train_accuracy = torch.sum(train_pred_classes == train_true_classes) / train_pred_classes.numel()
+
+    ## Compute validation error
+    valid_semantic_pred = torch.mm(W, valid_t)
+    _, valid_pred_classes = torch.max(torch.mm(valid_attr_mat.t(), valid_semantic_pred), dim=0)
+    _, valid_true_classes = torch.max(torch.mm(valid_attr_mat.t(), valid_semantic_t), dim=0)
+    valid_accuracy = torch.sum(valid_pred_classes == valid_true_classes) / valid_pred_classes.numel()
+
+    print('Training accuracy: ', train_accuracy)
+    print('Validation accuracy: ', valid_accuracy)
+
+    results = {}
+    results['weights'] = W
+    results['train_accuracy'] = train_accuracy
+    results['valid_accuracy'] = valid_accuracy
+    save_object(results, obj_name)
+
 exit()
     # val_t = torch.zeros(feature_size,valid_size)
-    # val_semantic_t = torch.zeros(description_size,valid_size)
+    # val_train_semantic_t = torch.zeros(description_size,valid_size)
 
 
 # M = torch.zeros(3, 2)
