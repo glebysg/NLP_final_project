@@ -1,0 +1,30 @@
+For apascal dataset:
+
+Total no. of classes : 20 + 12
+No. of seen classes : 20
+No. of unseen classes : 12
+Size of feature vector : 12695
+
+No. of instances of seen classes: 12694
+No. of instances of unseen classes : 2643
+
+Semantic description matrix S of seen classes (20 x 64)
+Semantic description matrix S of unseen classes (12 x 64)
+No. of descriptors : 64
+
+Assuming there is no validation splits
+
+N_train = 12694 . This number changes when we have validation splits.
+X_train (12695 x 12694)
+S_train (64 x 12694)
+
+Testing is done on unseen classes.
+N_test = 2643
+X_test (12695, 2643)
+S_test (64 x 2643)
+
+seen_class_ids (20,) : We will never use it. It is a list of actual class ids  of seen classes. 
+seen_attr_mat (20 x 64) : semantic description of the seen classes
+
+unseen_class_ids (12,) : We will never use it. It is a list of actual class ids of unseen classes. 
+unseen_attr_mat (12 x 64) : semantic description of the unseen classes
