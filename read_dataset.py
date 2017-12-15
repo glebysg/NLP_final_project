@@ -3,12 +3,28 @@ from scipy.linalg import solve_sylvester
 import os
 import random
 import math
+import argparse
+import torch
+
+# Example usage:
+# python read_dataset.py -p ./data/apascal/ -l 500000 -f 10
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", "--dataset_path",
+                    default='./data/apascal/',
+                    help=("full path to the dataset"))
+parser.add_argument("-l", "--lambda",
+                    default=500000, type=float,
+                    help=("full path to the dataset"))
+parser.add_argument("-f", "--folds",
+                    default=10,  type=int,
+                    help=("full path to the dataset"))
 
 def print_size_info():
-    print 'seen_class_ids: ', seen_class_ids.shape
-    print 'seen_attr_mat: ', seen_attr_mat.shape
-    print 'unseen_class_ids: ', unseen_class_ids.shape
-    print 'umseen_attr_mat: ', unseen_attr_mat.shape
+    print ('seen_class_ids: ', seen_class_ids.shape)
+    print ('seen_attr_mat: ', seen_attr_mat.shape)
+    print ('unseen_class_ids: ', unseen_class_ids.shape)
+    print ('umseen_attr_mat: ', unseen_attr_mat.shape)
 
 def combine_splits(splits, split_idx):
     # split_idx in [0, len(splits)-1]
@@ -17,11 +33,13 @@ def combine_splits(splits, split_idx):
     valid_class_ids = splits[split_idx]
     return train_class_ids, valid_class_ids
 
+args = vars(parser.parse_args())
+dataset_path = args['dataset_path']
+lambda_val = args['lambda']
+num_folds = args['folds']
 #dataset_path = '.\\apascal'
-dataset_path = '.\\animals'
+# dataset_path = '.\\animals'
 #dataset_path = '.\\sun'
-
-num_folds = 10
 
 fid = {}
 fid_count = {}
@@ -37,7 +55,8 @@ fid['seen_output'] = open(os.path.join(dataset_path,'seen_data_output.dat'),'r')
 fid_count['seen'] = 0
 # Find train-validation splits
 num_classes = seen_attr_mat.shape[0]
-class_indices = range(num_classes)
+class_indices = list(range(num_classes))
+print(class_indices)
 random.shuffle(class_indices)
 num_classes_per_fold = int(math.floor(num_classes / num_folds ))
 splits = [class_indices[fold_idx:fold_idx+num_classes_per_fold] for fold_idx in range(0,num_classes,num_classes_per_fold)]
@@ -45,10 +64,10 @@ if len(splits[-1]) < num_classes_per_fold:
     splits[-2] += (splits[-1])
     del splits[-1]
 
-print 'splits: \n', splits, '\n'
+print ('splits: \n', splits, '\n')
 train_class_ids, valid_class_ids = combine_splits(splits, 1)
-print 'train_class_ids: \n', train_class_ids, '\n'
-print 'valid_class_ids: \n', valid_class_ids, '\n'
+print ('train_class_ids: \n', train_class_ids, '\n')
+print ('valid_class_ids: \n', valid_class_ids, '\n')
 
 ## Unseen Data
 unseen_class_ids = data['unseen_class_ids']
@@ -58,11 +77,40 @@ fid['unseen_input'] = open(os.path.join(dataset_path,'unseen_data_input.dat'),'r
 fid['unseen_output'] = open(os.path.join(dataset_path,'unseen_data_output.dat'),'r')
 fid_count['unseen'] = 0
 
-# temp = []
-# for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
-#     feat_in = map(float,feat_in.split(','))
-#     print len(feat_in)
-#     temp.append(feat_in)
+# training_in_t =
+# training_out_t =
+# validation_in_t =
+# validation_out_t =
+
+temp = []
+
+for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
+    feat_in = list(map(float,feat_in.split(',')))
+    print("Train Feat in",len(feat_in))
+    break
+    # print("Feat out",len(feat_out))
+    # temp.append(feat_in)
+    # exit()
+
+count = 0
+for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
+    count += 1
+
+
+print("COUNT TRAIN: ",count)
+
+
+
+for feat_in, feat_out in zip(fid['unseen_input'], fid['unseen_output']):
+    feat_in = list(map(float,feat_in.split(',')))
+    print("Test Feat in",len(feat_in))
+    break
+
+count = 0
+for feat_in, feat_out in zip(fid['unseen_input'], fid['unseen_output']):
+    count += 1
+
+print("COUNT TEST: ",count)
 
 # print len(temp), len(temp[0])
 
