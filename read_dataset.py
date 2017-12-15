@@ -39,10 +39,8 @@ def combine_splits(splits, split_idx):
     return train_class_ids, valid_class_ids
 
 def refresh_file_pointers(dict_key,file_name,data_path):
-    fid[dict_key] = open(os.path.join(data_path,file_name),'r')
-
-def close_file_pointers(dict_key):
     fid[dict_key].close()
+    fid[dict_key] = open(os.path.join(data_path,file_name),'r')
 
 args = vars(parser.parse_args())
 dataset_path = args['dataset_path']
@@ -75,7 +73,6 @@ if len(splits[-1]) < num_classes_per_fold:
     splits[-2] += (splits[-1])
     del splits[-1]
 
-
 ## Unseen Data
 unseen_class_ids = data['unseen_class_ids']
 unseen_class_ids.shape = (unseen_class_ids.shape[0],)
@@ -98,36 +95,45 @@ for index in range(1):
         feature_size = list(map(float,feat_in.split(',')))
         feature_size = len(feature_size)
         break
-    close_file_pointers('seen_input')
+    print('feature_size: ', feature_size)
     refresh_file_pointers('seen_input','seen_data_input.dat',dataset_path)
     for feat_out in fid['seen_output']:
-        if int(feat_out) in train_class_ids:
+        if (int(feat_out)-1) in train_class_ids:
             train_size += 1
-        if int(feat_out) in valid_class_ids:
+        elif (int(feat_out)-1) in valid_class_ids:
             valid_size += 1
-    close_file_pointers('seen_output')
+        else:
+            print("Error: class not present in list")
+            exit(1)
+    print('splits: ', splits)
+    print ('train_class_ids: ', train_class_ids)
+    print ('valid_class_ids: ', valid_class_ids)
+    print('train_size: ', train_size)
+    print('valid_size: ', valid_size)
     refresh_file_pointers('seen_output','seen_data_output.dat',dataset_path)
     # Create the tensors
     train_t = torch.zeros(feature_size,train_size)
+    print ('train_t size', train_t)
     semantic_t = torch.zeros(description_size,train_size)
-    print(description_size,train_size)
-    print(semantic_t)
+    print('description_size,train_size', description_size,train_size)
+    print('semantic_t size: ', semantic_t)
     w_t = torch.zeros(description_size,feature_size)
+    print()
     seen_train_index = 0
     for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
-        feat_out = int(feat_out)
+        feat_out = int(feat_out) - 1 
         feat_in_split = list(map(float,feat_in.split(',')))
         if int(feat_out) in train_class_ids:
             # print("train t size:", train_t[:,seen_train_index].size())
             # print("train t receiving:", torch.FloatTensor(feat_in_split).size())
             train_t[:,seen_train_index] = torch.FloatTensor(feat_in_split)
             semantic_t[:,seen_train_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
-        seen_train_index += 1
+            seen_train_index += 1
 
     A = torch.mm(semantic_t,semantic_t.t())
     B = lambda_val*torch.mm(train_t,train_t.t())
     C = (1 + lambda_val)*torch.mm(semantic_t,train_t.t())
-
+    print("Solving Sylvester")
     W = solve_sylvester(A.numpy(), B.numpy(), C.numpy())
     save_object(W,'first_w')
 exit()
