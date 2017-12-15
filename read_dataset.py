@@ -33,6 +33,12 @@ def combine_splits(splits, split_idx):
     valid_class_ids = splits[split_idx]
     return train_class_ids, valid_class_ids
 
+def refresh_file_pointers(dict_key,file_name,data_path):
+    fid[dict_key] = open(os.path.join(data_path,file_name),'r')
+
+def close_file_pointers(dict_key):
+    fid[dict_key].close()
+
 args = vars(parser.parse_args())
 dataset_path = args['dataset_path']
 lambda_val = args['lambda']
@@ -65,7 +71,6 @@ if len(splits[-1]) < num_classes_per_fold:
     del splits[-1]
 
 print ('splits: \n', splits, '\n')
-train_class_ids, valid_class_ids = combine_splits(splits, 1)
 print ('train_class_ids: \n', train_class_ids, '\n')
 print ('valid_class_ids: \n', valid_class_ids, '\n')
 
@@ -77,6 +82,42 @@ fid['unseen_input'] = open(os.path.join(dataset_path,'unseen_data_input.dat'),'r
 fid['unseen_output'] = open(os.path.join(dataset_path,'unseen_data_output.dat'),'r')
 fid_count['unseen'] = 0
 
+## Count the dimentions of the training and validation folds
+# for index in range(len(train_class_ids)):
+for index in range(1):
+    train_class_ids, valid_class_ids = combine_splits(splits, index)
+    train_size = 0
+    valid_size = 0
+    feature_size = seen_attr_mat.shape[1]
+    description_size = 0
+    train_classes_size = len(train_class_ids)
+    valid_classes_size = len(valid_class_ids)
+    for feat_in in fid['seen_input']:
+        feature_size = list(map(float,feat_in.split(',')))
+        feature_size = len(feature_size)
+        break
+    close_file_pointers('seen_input')
+    refresh_file_pointers('seen_input','seen_data_input.dat',dataset_path)
+    for feat_out in fid['seen_output']:
+        if feat_out in train_class_ids:
+            train_size += 1
+        if feat_out in valid_class_ids:
+            valid_size += 1
+    close_file_pointers('seen_output')
+    refresh_file_pointers('seen_output','seen_data_output.dat',dataset_path)
+    # Create the tensors
+    train_t = torch.zeros(feature_size,train_size)
+    semantic_t = torch.zeros(description_size,train_size)
+    w_t = torch.zeros(description_size,feature_size)
+    print("THE TENSORS DID NOT EXPLODE")
+
+
+    exit()
+    val_t = torch.zeros(feature_size,valid_size)
+    val_semantic_t = torch.zeros(description_size,valid_size)
+
+
+# M = torch.zeros(3, 2)
 # training_in_t =
 # training_out_t =
 # validation_in_t =
