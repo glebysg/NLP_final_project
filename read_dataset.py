@@ -62,12 +62,16 @@ attr_path = os.path.join(dataset_path, 'attr_data.mat')
 data = loadmat(attr_path)
 
 ## Seen Data
+start_time = time.time()
 seen_class_ids = torch.LongTensor(data['seen_class_ids'])
 seen_attr_mat = torch.FloatTensor(data['seen_attr_mat'])
 fid['seen_input'] = open(os.path.join(dataset_path,'seen_data_input.dat'),'r')
 fid['seen_output'] = open(os.path.join(dataset_path,'seen_data_output.dat'),'r')
 fid_count['seen'] = 0
+print('Seen Data: ', time.time()-start_time)
+
 # Find train-validation splits
+start_time = time.time()
 num_classes = seen_attr_mat.shape[0]
 class_indices = list(range(num_classes))
 print(class_indices)
@@ -77,27 +81,39 @@ splits = [class_indices[fold_idx:fold_idx+num_classes_per_fold] for fold_idx in 
 if len(splits[-1]) < num_classes_per_fold:
     splits[-2] += (splits[-1])
     del splits[-1]
+print('Find train-validation splits: ', time.time()-start_time)
 
 ## Unseen Data
+start_time = time.time()
 unseen_class_ids = torch.FloatTensor(data['unseen_class_ids'])
 unseen_attr_mat = torch.FloatTensor(data['unseen_attr_mat'])
 fid['unseen_input'] = open(os.path.join(dataset_path,'unseen_data_input.dat'),'r')
 fid['unseen_output'] = open(os.path.join(dataset_path,'unseen_data_output.dat'),'r')
 fid_count['unseen'] = 0
+print('Unseen Data: ', time.time()-start_time)
+# print('seen_attr_mat: ', seen_attr_mat)
+# print('unseen_attr_mat: ', unseen_attr_mat)
 
 ## 
 # For each split in splits: create 
 # split_attr
 # for split in splits:
 
+# exit()
 
 ## Count the dimentions of the training and validation folds
+results = {}
+train_accuracy_list =[]
+valid_accuracy_list =[]
+
 # for index in range(len(train_class_ids)):
 for index in range(1):
     # Combine the splits into training and validation
     train_class_ids, valid_class_ids = combine_splits(splits, index)
 
     # Finding training and validation attribute matrix
+    # ----------------
+    start_time = time.time()
     train_attr_mat = torch.zeros(len(train_class_ids), seen_attr_mat.size()[1])
     valid_attr_mat = torch.zeros(len(valid_class_ids), seen_attr_mat.size()[1])
     train_class_count = 0
@@ -109,7 +125,11 @@ for index in range(1):
     for class_id in valid_class_ids:
         valid_attr_mat[valid_class_count,:] = seen_attr_mat[class_id,:]
         valid_class_count += 1
+    print('Finding training and validation attribute matrix: ', time.time()-start_time)
 
+    #Finding the dataset sizes
+    #-------------------
+    start_time = time.time()
     train_size = 0
     valid_size = 0
     description_size = seen_attr_mat.shape[1]
@@ -135,8 +155,13 @@ for index in range(1):
     print ('valid_class_ids: ', valid_class_ids)
     print('train_size: ', train_size)
     print('valid_size: ', valid_size)
+    print('Finding the dataset sizes: ', time.time()-start_time)
+
     refresh_file_pointers('seen_output','seen_data_output.dat',dataset_path)
-    # Create the tensors
+
+    # Create the empty tensors
+    #---------------------
+    start_time = time.time()
     train_t = torch.zeros(feature_size,train_size)
     valid_t = torch.zeros(feature_size,valid_size)
     print ('train_t size', train_t)
@@ -144,12 +169,13 @@ for index in range(1):
     valid_semantic_t = torch.zeros(description_size,valid_size)
     print('description_size,train_size', description_size,train_size)
     print('train_semantic_t size: ', train_semantic_t)
-    w_t = torch.zeros(description_size,feature_size)
-    print()
+    print('Create the empty tensors: ', time.time()-start_time)
+
+    # Filling the empty tensors
+    #-----------------------
+    start_time = time.time()
     seen_train_index = 0
     seen_valid_index = 0
-    train_accuracy_list =[]
-    valid_accuracy_list =[]
     for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
         feat_out = int(feat_out) - 1 
         feat_in_split = list(map(float,feat_in.split(',')))
@@ -165,12 +191,19 @@ for index in range(1):
             seen_valid_index += 1
         else:
             print("Error: class not present in list")
-            exit(1)           
+            exit(1)       
+    print('Filling the empty tensors: ', time.time()-start_time)    
 
+    # Computing A, B, C
+    #-------------
+    start_time = time.time()
     A = torch.mm(train_semantic_t,train_semantic_t.t())
     B = lambda_val*torch.mm(train_t,train_t.t())
     C = (1 + lambda_val)*torch.mm(train_semantic_t,train_t.t())
+    print('Computing A, B, C: ', time.time()-start_time)
 
+    # Solving the Sylvester
+    #--------------
     start_time = time.time()
     print("Solving Sylvester")
     W = solve_sylvester(A.numpy(), B.numpy(), C.numpy())
@@ -178,27 +211,42 @@ for index in range(1):
     W = torch.FloatTensor(W)
 
     ## Compute training error
+    start_time = time.time()
     train_semantic_pred = torch.mm(W, train_t)
-    _, train_pred_classes = torch.max(torch.mm(train_attr_mat.t(), train_semantic_pred), dim=0)
-    _, train_true_classes = torch.max(torch.mm(train_attr_mat.t(), train_semantic_t), dim=0)
+    _, train_pred_classes = torch.max(torch.mm(train_attr_mat, train_semantic_pred), dim=0)
+    _, train_true_classes = torch.max(torch.mm(train_attr_mat, train_semantic_t), dim=0)
     train_accuracy = torch.sum(train_pred_classes == train_true_classes) / train_pred_classes.numel()
     train_accuracy_list.append(train_accuracy)
+    print('Compute training error: ', time.time()-start_time)
 
     ## Compute validation error
+    start_time = time.time()
     valid_semantic_pred = torch.mm(W, valid_t)
-    _, valid_pred_classes = torch.max(torch.mm(valid_attr_mat.t(), valid_semantic_pred), dim=0)
-    _, valid_true_classes = torch.max(torch.mm(valid_attr_mat.t(), valid_semantic_t), dim=0)
+    _, valid_pred_classes = torch.max(torch.mm(valid_attr_mat, valid_semantic_pred), dim=0)
+    _, valid_true_classes = torch.max(torch.mm(valid_attr_mat, valid_semantic_t), dim=0)
     valid_accuracy = torch.sum(valid_pred_classes == valid_true_classes) / valid_pred_classes.numel()
-    valid_accuracy_list.append(valid_accuracy_list)
+    valid_accuracy_list.append(valid_accuracy)
+    print('Compute validation error: ', time.time()-start_time)
 
-    print('Training accuracy: ', train_accuracy[-1])
-    print('Validation accuracy: ', valid_accuracy[-1])
+    #Saving the files in a dictionary
+    start_time = time.time()
+    print('Training accuracy: ', train_accuracy_list[-1])
+    print('Validation accuracy: ', valid_accuracy_list[-1])
+    results['weights'] = W # Saving only the last set of weights.
+    results['train_pred_classes'] = train_pred_classes
+    results['train_true_classes'] = train_true_classes
+    results['valid_pred_classes'] = valid_pred_classes
+    results['valid_true_classes'] = valid_true_classes
+    print('Saving the files in a dictionary: ', time.time()-start_time)
 
-results = {}
-results['weights'] = W
 results['train_accuracy'] = train_accuracy_list
 results['valid_accuracy'] = valid_accuracy_list
+
+# test_t = torch.zeros(feature_size,train_size)
+
+start_time = time.time()
 save_object(results, obj_name)
+print('Saving the pickle: ', time.time()-start_time)
 
 exit()
     # val_t = torch.zeros(feature_size,valid_size)
