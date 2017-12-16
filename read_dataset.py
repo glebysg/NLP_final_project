@@ -148,6 +148,8 @@ for index in range(1):
     print()
     seen_train_index = 0
     seen_valid_index = 0
+    train_accuracy_list =[]
+    valid_accuracy_list =[]
     for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
         feat_out = int(feat_out) - 1 
         feat_in_split = list(map(float,feat_in.split(',')))
@@ -180,21 +182,23 @@ for index in range(1):
     _, train_pred_classes = torch.max(torch.mm(train_attr_mat.t(), train_semantic_pred), dim=0)
     _, train_true_classes = torch.max(torch.mm(train_attr_mat.t(), train_semantic_t), dim=0)
     train_accuracy = torch.sum(train_pred_classes == train_true_classes) / train_pred_classes.numel()
+    train_accuracy_list.append(train_accuracy)
 
     ## Compute validation error
     valid_semantic_pred = torch.mm(W, valid_t)
     _, valid_pred_classes = torch.max(torch.mm(valid_attr_mat.t(), valid_semantic_pred), dim=0)
     _, valid_true_classes = torch.max(torch.mm(valid_attr_mat.t(), valid_semantic_t), dim=0)
     valid_accuracy = torch.sum(valid_pred_classes == valid_true_classes) / valid_pred_classes.numel()
+    valid_accuracy_list.append(valid_accuracy_list)
 
-    print('Training accuracy: ', train_accuracy)
-    print('Validation accuracy: ', valid_accuracy)
+    print('Training accuracy: ', train_accuracy[-1])
+    print('Validation accuracy: ', valid_accuracy[-1])
 
-    results = {}
-    results['weights'] = W
-    results['train_accuracy'] = train_accuracy
-    results['valid_accuracy'] = valid_accuracy
-    save_object(results, obj_name)
+results = {}
+results['weights'] = W
+results['train_accuracy'] = train_accuracy_list
+results['valid_accuracy'] = valid_accuracy_list
+save_object(results, obj_name)
 
 exit()
     # val_t = torch.zeros(feature_size,valid_size)
