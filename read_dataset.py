@@ -62,9 +62,8 @@ attr_path = os.path.join(dataset_path, 'attr_data.mat')
 data = loadmat(attr_path)
 
 ## Seen Data
-seen_class_ids = data['seen_class_ids']
-seen_class_ids.shape = (seen_class_ids.shape[0],)
-seen_attr_mat = data['seen_attr_mat']
+seen_class_ids = torch.LongTensor(data['seen_class_ids'])
+seen_attr_mat = torch.FloatTensor(data['seen_attr_mat'])
 fid['seen_input'] = open(os.path.join(dataset_path,'seen_data_input.dat'),'r')
 fid['seen_output'] = open(os.path.join(dataset_path,'seen_data_output.dat'),'r')
 fid_count['seen'] = 0
@@ -80,12 +79,17 @@ if len(splits[-1]) < num_classes_per_fold:
     del splits[-1]
 
 ## Unseen Data
-unseen_class_ids = data['unseen_class_ids']
-unseen_class_ids.shape = (unseen_class_ids.shape[0],)
-unseen_attr_mat = data['unseen_attr_mat']
+unseen_class_ids = torch.FloatTensor(data['unseen_class_ids'])
+unseen_attr_mat = torch.FloatTensor(data['unseen_attr_mat'])
 fid['unseen_input'] = open(os.path.join(dataset_path,'unseen_data_input.dat'),'r')
 fid['unseen_output'] = open(os.path.join(dataset_path,'unseen_data_output.dat'),'r')
 fid_count['unseen'] = 0
+
+## 
+# For each split in splits: create 
+# split_attr
+# for split in splits:
+
 
 ## Count the dimentions of the training and validation folds
 # for index in range(len(train_class_ids)):
@@ -94,14 +98,17 @@ for index in range(1):
     train_class_ids, valid_class_ids = combine_splits(splits, index)
 
     # Finding training and validation attribute matrix
-    train_attr_mat = []
-    valid_attr_mat = []
+    train_attr_mat = torch.zeros(len(train_class_ids), seen_attr_mat.size()[1])
+    valid_attr_mat = torch.zeros(len(valid_class_ids), seen_attr_mat.size()[1])
+    train_class_count = 0
     for class_id in train_class_ids:
-        train_attr_mat.append(seen_attr_mat[class_id,:])
-    train_attr_mat = np.array(train_attr_mat)
+        train_attr_mat[class_count,:] = seen_attr_mat[class_id,:]
+        train_class_count += 1
+
+    valid_class_count = 0
     for class_id in valid_class_ids:
-        valid_attr_mat.append(seen_attr_mat[class_id,:])
-    valid_attr_mat = np.array(valid_attr_mat)
+        valid_attr_mat[class_count,:] = seen_attr_mat[class_id,:]
+        valid_class_count += 1
 
     # 
     train_size = 0
@@ -149,11 +156,11 @@ for index in range(1):
             # print("train t size:", train_t[:,seen_train_index].size())
             # print("train t receiving:", torch.FloatTensor(feat_in_split).size())
             train_t[:,seen_train_index] = torch.FloatTensor(feat_in_split)
-            train_semantic_t[:,seen_train_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
+            train_semantic_t[:,seen_train_index] = seen_attr_mat[feat_out,:]
             seen_train_index += 1
         elif int(feat_out) in valid_class_ids:
             valid_t[:,seen_valid_index] = torch.FloatTensor(feat_in_split)
-            valid_semantic_t[:,seen_valid_index] = torch.FloatTensor(seen_attr_mat[feat_out,:])
+            valid_semantic_t[:,seen_valid_index] = seen_attr_mat[feat_out,:]
             seen_valid_index += 1
         else:
             print("Error: class not present in list")
