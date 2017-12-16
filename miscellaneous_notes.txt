@@ -1,0 +1,6 @@
+The lambda = 500,000 is tuned for smaller animals dataset. If we want to use the larger dataset, we need to tune it again. 
+
+We need to normalize the weights (row wise) coming from the sylvester. 
+
+Semantic descriptions should be normalized row wise or description wise. 
+
