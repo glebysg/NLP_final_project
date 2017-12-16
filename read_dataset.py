@@ -102,15 +102,14 @@ for index in range(1):
     valid_attr_mat = torch.zeros(len(valid_class_ids), seen_attr_mat.size()[1])
     train_class_count = 0
     for class_id in train_class_ids:
-        train_attr_mat[class_count,:] = seen_attr_mat[class_id,:]
+        train_attr_mat[train_class_count,:] = seen_attr_mat[class_id,:]
         train_class_count += 1
 
     valid_class_count = 0
     for class_id in valid_class_ids:
-        valid_attr_mat[class_count,:] = seen_attr_mat[class_id,:]
+        valid_attr_mat[valid_class_count,:] = seen_attr_mat[class_id,:]
         valid_class_count += 1
 
-    # 
     train_size = 0
     valid_size = 0
     description_size = seen_attr_mat.shape[1]
