@@ -8,6 +8,7 @@ import torch
 import pickle
 import time
 import numpy as np
+from sklearn.decomposition import PCA
 
 # Example usage:
 # python read_dataset.py -p ./data/apascal/ -l 500000 -f 10 -r 10f_apascal
@@ -60,6 +61,8 @@ fid = {}
 fid_count = {}
 attr_path = os.path.join(dataset_path, 'attr_data.mat')
 data = loadmat(attr_path)
+
+pca_feature_size = 1000
 
 ## Seen Data
 start_time = time.time()
@@ -164,11 +167,11 @@ for index in range(1):
     start_time = time.time()
     train_t = torch.zeros(feature_size,train_size)
     valid_t = torch.zeros(feature_size,valid_size)
-    print ('train_t size', train_t)
+    print ('train_t size', train_t.size())
     train_semantic_t = torch.zeros(description_size,train_size)
     valid_semantic_t = torch.zeros(description_size,valid_size)
     print('description_size,train_size', description_size,train_size)
-    print('train_semantic_t size: ', train_semantic_t)
+    print('train_semantic_t size: ', train_semantic_t.size())
     print('Create the empty tensors: ', time.time()-start_time)
 
     # Filling the empty tensors
@@ -193,6 +196,15 @@ for index in range(1):
             print("Error: class not present in list")
             exit(1)       
     print('Filling the empty tensors: ', time.time()-start_time)    
+
+    ## Applying PCA
+    #--------------
+    start_time = time.time()
+    pca = PCA(n_components=int(pca_feature_size), svd_solver='arpack')
+    pca.fit(train_t.numpy().transpose())
+    train_t = torch.FloatTensor(pca.transform(train_t.numpy().transpose()).transpose())
+    print('train_t size: ', train_t.size(), type(train_t))
+    print('PCA Time: ', time.time()-start_time)
 
     # Computing A, B, C
     #-------------
@@ -221,6 +233,7 @@ for index in range(1):
 
     ## Compute validation error
     start_time = time.time()
+    valid_t = torch.FloatTensor(pca.transform(valid_t.numpy().transpose()).transpose())
     valid_semantic_pred = torch.mm(W, valid_t)
     _, valid_pred_classes = torch.max(torch.mm(valid_attr_mat, valid_semantic_pred), dim=0)
     _, valid_true_classes = torch.max(torch.mm(valid_attr_mat, valid_semantic_t), dim=0)
