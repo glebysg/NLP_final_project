@@ -77,7 +77,6 @@ print('Seen Data: ', time.time()-start_time)
 start_time = time.time()
 num_classes = seen_attr_mat.shape[0]
 class_indices = list(range(num_classes))
-print(class_indices)
 random.shuffle(class_indices)
 num_classes_per_fold = int(math.floor(num_classes / num_folds ))
 splits = [class_indices[fold_idx:fold_idx+num_classes_per_fold] for fold_idx in range(0,num_classes,num_classes_per_fold)]
@@ -153,9 +152,9 @@ for index in range(1):
         else:
             print("Error: class not present in list")
             exit(1)
-    print('splits: ', splits)
-    print ('train_class_ids: ', train_class_ids)
-    print ('valid_class_ids: ', valid_class_ids)
+    print('No. of splits: ', len(splits))
+    print ('No. of train_class_ids: ', len(train_class_ids))
+    print ('No. of valid_class_ids: ', len(valid_class_ids))
     print('train_size: ', train_size)
     print('valid_size: ', valid_size)
     print('Finding the dataset sizes: ', time.time()-start_time)
@@ -199,12 +198,12 @@ for index in range(1):
 
     ## Applying PCA
     #--------------
-    start_time = time.time()
-    pca = PCA(n_components=int(pca_feature_size), svd_solver='arpack')
-    pca.fit(train_t.numpy().transpose())
-    train_t = torch.FloatTensor(pca.transform(train_t.numpy().transpose()).transpose())
-    print('train_t size: ', train_t.size(), type(train_t))
-    print('PCA Time: ', time.time()-start_time)
+    # start_time = time.time()
+    # pca = PCA(n_components=int(pca_feature_size), svd_solver='arpack')
+    # pca.fit(train_t.numpy().transpose())
+    # train_t = torch.FloatTensor(pca.transform(train_t.numpy().transpose()).transpose())
+    # print('train_t size: ', train_t.size(), type(train_t))
+    # print('PCA Time: ', time.time()-start_time)
 
     # Computing A, B, C
     #-------------
@@ -233,7 +232,7 @@ for index in range(1):
 
     ## Compute validation error
     start_time = time.time()
-    valid_t = torch.FloatTensor(pca.transform(valid_t.numpy().transpose()).transpose())
+    # valid_t = torch.FloatTensor(pca.transform(valid_t.numpy().transpose()).transpose())
     valid_semantic_pred = torch.mm(W, valid_t)
     _, valid_pred_classes = torch.max(torch.mm(valid_attr_mat, valid_semantic_pred), dim=0)
     _, valid_true_classes = torch.max(torch.mm(valid_attr_mat, valid_semantic_t), dim=0)
