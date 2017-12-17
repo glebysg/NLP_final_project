@@ -176,7 +176,7 @@ full_valid_accuracy_list =[]
 ##########################
 
 # Tune the parameters
-begin_val = 100000.0
+begin_val = 10000.0
 end_val = 900000.0
 exploration_step = 100000.0
 pivot = begin_val

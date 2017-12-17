@@ -52,6 +52,7 @@ args = vars(parser.parse_args())
 dataset_path = args['dataset_path']
 lambda_val = args['lambda']
 obj_name = args['r_name']
+print('Dataset: ', dataset_path)
 
 ### Init Global Variables [Constants]
 seen_in_dict = 'seen_input'
@@ -81,8 +82,8 @@ description_size = None
 ##########################
 
 ## Seen Data Initilization
-print('Seen Data Initilization: ')
-start_time = time.time()
+# print('Seen Data Initilization: ')
+# start_time = time.time()
 # Load seen attribute matrices
 seen_class_ids = torch.LongTensor(data['seen_class_ids'])
 seen_attr_mat = torch.FloatTensor(data['seen_attr_mat'])
@@ -98,35 +99,35 @@ for feat_in in fid[seen_in_dict]:
     feature_size = len(feature_size)
     break
 refresh_file_pointers(seen_in_dict,seen_in_dat,dataset_path)
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 ## Unseen Data Initialization
-print('Unseen Data Initialization: ')
-start_time = time.time()
+# print('Unseen Data Initialization: ')
+# start_time = time.time()
 unseen_class_ids = torch.FloatTensor(data['unseen_class_ids'])
 unseen_attr_mat = torch.FloatTensor(data['unseen_attr_mat'])
 ## Load file readers for unseen Data
 fid[unseen_in_dict] = open(os.path.join(dataset_path,unseen_in_dat),'r')
 fid[unseen_out_dict] = open(os.path.join(dataset_path,unseen_out_dat),'r')
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 ##############################
 ####  SEEN DATA LOADING   ####
 ##############################
 
 ## Create the empty training tensors
-print('Creating the empty training tensors')
-start_time = time.time()
+# print('Creating the empty training tensors')
+# start_time = time.time()
 dataset_classes = get_dataset_dict(dataset_path,fid[seen_out_dict],seen_dataset_dict)
 train_size = sum([value for key, value in dataset_classes.items()])
 refresh_file_pointers(seen_out_dict,seen_out_dat,dataset_path)
 train_t = torch.zeros(feature_size,train_size)
 semantic_t = torch.zeros(description_size,train_size)
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 ## Filling the empty training tensors
-start_time = time.time()
-print('Filling the empty training tensors')
+# start_time = time.time()
+# print('Filling the empty training tensors')
 train_index = 0
 for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
     feat_out = int(feat_out) - 1
@@ -134,25 +135,25 @@ for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
     train_t[:,train_index] = torch.FloatTensor(feat_in_split)
     semantic_t[:,train_index] = seen_attr_mat[feat_out,:]
     train_index += 1
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 ################################
 ####  UNSEEN DATA LOADING   ####
 ################################
 
 ## Create the empty testing tensors
-print('Creating the empty testing tensors')
-start_time = time.time()
+# print('Creating the empty testing tensors')
+# start_time = time.time()
 test_dataset_classes = get_dataset_dict(dataset_path,fid[unseen_out_dict], unseen_dataset_dict)
 test_size = sum([value for key, value in test_dataset_classes.items()])
 refresh_file_pointers(unseen_out_dict,unseen_out_dat,dataset_path)
 test_t = torch.zeros(feature_size,test_size)
 test_true_classes = torch.zeros(test_size).long()
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 ## Filling the empty testing tensors
-start_time = time.time()
-print('Filling the empty testing tensors')
+# start_time = time.time()
+# print('Filling the empty testing tensors')
 test_index = 0
 for feat_in, feat_out in zip(fid[unseen_in_dict], fid[unseen_out_dict]):
     feat_out = int(feat_out) - 1
@@ -160,20 +161,20 @@ for feat_in, feat_out in zip(fid[unseen_in_dict], fid[unseen_out_dict]):
     test_t[:,test_index] = torch.FloatTensor(feat_in_split)
     test_true_classes[test_index] = feat_out
     test_index += 1
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 ##########################
 ####     TRAINING     ####
 ##########################
 
 ## Obtaining inputs to Sylvester
-start_time = time.time()
-print('Obtaining inputs to Sylvester')
+# start_time = time.time()
+# print('Obtaining inputs to Sylvester')
 train_t = f.normalize(train_t,p=2,dim=1)
 A = torch.mm(semantic_t,semantic_t.t())
 B = lambda_val*torch.mm(train_t,train_t.t())
 C = (1 + lambda_val)*torch.mm(semantic_t,train_t.t())
-print('Time taken: ', time.time()-start_time, '\n')
+# print('Time taken: ', time.time()-start_time, '\n')
 
 # Solving the Sylvester
 start_time = time.time()
@@ -219,8 +220,8 @@ print('Time taken : ', time.time()-start_time, '\n')
 ##########################
 
 ## Save files in dictionary and into a pickle
-print('Save files in dictionary and into a pickle: ')
-start_time = time.time()
+# print('Save files in dictionary and into a pickle: ')
+# start_time = time.time()
 results['weights'] = W 
 results['train_pred_classes'] = train_pred_classes
 results['train_true_classes'] = train_true_classes
@@ -229,7 +230,7 @@ results['test_true_classes'] = test_true_classes
 results['train_accuracy'] = train_accuracy
 results['test_accuracy'] = test_accuracy
 save_object(results, obj_name)
-print('Time taken : ', time.time()-start_time, '\n')
+# print('Time taken : ', time.time()-start_time, '\n')
 
 ##########################
 ####  CLOSING FILES   ####
@@ -239,3 +240,5 @@ fid[seen_in_dict].close()
 fid[seen_out_dict].close()
 fid[unseen_in_dict].close()
 fid[unseen_out_dict].close()
+
+print('-------------------------------------------\n')
