@@ -1,0 +1,36 @@
+
+Introduction:
+1/2 page
+Background:
+1/2 page
+
+Methodology:
+  Explanation of SAE:
+  Explanation about Datasets:
+    * Apascal
+    * Sun
+    * Animals
+  Algorithms:
+    * SAE
+    * SAE - PCA
+    * SAE - RF
+  Adding the regularizer and changing the math:
+  Methods for tuning: Tuning heuristic
+
+Experiments and Results:
+  * Seen / Unseen Data splits
+  * 10 fold cross validation [only on pca and rf]
+
+Plots and Tables:
+  * Table. x - all methods (regular, pca, rf) and all datasets (apy, anim, sun) : y - train, avg. valid, test acuracies, F1 scores.
+  * Tuned lambda parameters for each dataset.
+  * Tuned beta parameters for each dataset.
+
+Problems/Issues:
+  * Huge dataset that doesn't fit into the main memory
+  * Understanding the preprocessed features. [Write the Chi square - ]
+  * An extra pre processing step that is not described in the paper in the cited work. The dataset given for animals shows this thing.
+
+
+Make some plots
+Tables
