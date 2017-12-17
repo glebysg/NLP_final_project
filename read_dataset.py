@@ -100,17 +100,6 @@ fid_count['unseen'] = 0
 print('Unseen Data: ', time.time()-start_time)
 
 
-
-for feat_out in fid[seen_out_dict]:
-    if (int(feat_out)-1) in train_class_ids:
-        train_size += 1
-    elif (int(feat_out)-1) in valid_class_ids:
-        valid_size += 1
-    else:
-        print("Error: class not present in list")
-        exit(1)
-print("GOT HERE")
-
 # Find train-validation splits
 start_time = time.time()
 num_classes = seen_attr_mat.shape[0]
@@ -123,7 +112,6 @@ if len(splits[-1]) < num_classes_per_fold:
     splits[-2] += (splits[-1])
     del splits[-1]
 print('Find train-validation splits: ', time.time()-start_time)
-
 
 
 ## Load The splits in memory
@@ -139,9 +127,7 @@ refresh_file_pointers(seen_in_dict,seen_in_dat,dataset_path)
 #-----------------------
 start_time = time.time()
 
-
 dataset_classes = get_dataset_dict(dataset_path,fid[seen_out_dict],seen_dataset_dict)
-print("dataset_classes: ", dataset_classes)
 refresh_file_pointers(seen_out_dict,seen_out_dat,dataset_path)
 splits_t = []
 splits_semantic_t = []
@@ -151,6 +137,7 @@ for split in splits:
     split_tensor = torch.zeros(feature_size,instance_num)
     split_semantic_tensor = torch.zeros(description_size,instance_num)
     splits_t.append(split_tensor)
+    splits_semantic_t.append(split_semantic_tensor)
 print('Creating the empty split tensors: ', time.time()-start_time)
 
 # Filling the empty tensors
@@ -166,7 +153,7 @@ for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
     for index in range(len(splits)):
         if int(feat_out) in splits[index]:
             splits_t[index][:,split_index[index]] = torch.FloatTensor(feat_in_split)
-            train_semantic_t[:,split_index[index]] = seen_attr_mat[feat_out,:]
+            splits_semantic_t[index][:,split_index[index]] = seen_attr_mat[feat_out,:]
             split_index[index] += 1
             value_asigned = True
             break
@@ -174,12 +161,13 @@ for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
         print("ERROR: Class not found in splits")
         exit(1)
 print('Filling the empty tensors: ', time.time()-start_time)
+refresh_file_pointers(seen_in_dict,seen_in_dat,dataset_path)
+refresh_file_pointers(seen_out_dict,seen_out_dat,dataset_path)
 
 results = {}
 train_accuracy_list =[]
 valid_accuracy_list =[]
 
-exit()
 ##########################
 #####     MAIN        ####
 ##########################
@@ -205,72 +193,31 @@ for index in range(num_folds):
         valid_class_count += 1
     print('Finding training and validation attribute matrix: ', time.time()-start_time)
 
-    #Finding the dataset sizes
+    #Build the splits
     #-------------------
     start_time = time.time()
-    train_size = 0
-    valid_size = 0
-    description_size = seen_attr_mat.shape[1]
-    feature_size = 0
-    train_classes_size = len(train_class_ids)
-    valid_classes_size = len(valid_class_ids)
-    for feat_in in fid[seen_in_dict]:
-        feature_size = list(map(float,feat_in.split(',')))
-        feature_size = len(feature_size)
-        break
-    print('feature_size: ', feature_size)
-    refresh_file_pointers(seen_in_dict,seen_in_dat,dataset_path)
-    for feat_out in fid[seen_out_dict]:
-        if (int(feat_out)-1) in train_class_ids:
-            train_size += 1
-        elif (int(feat_out)-1) in valid_class_ids:
-            valid_size += 1
-        else:
-            print("Error: class not present in list")
-            exit(1)
-    print('splits: ', splits)
-    print ('train_class_ids: ', train_class_ids)
-    print ('valid_class_ids: ', valid_class_ids)
-    print('train_size: ', train_size)
-    print('valid_size: ', valid_size)
-    print('Finding the dataset sizes: ', time.time()-start_time)
-
-    refresh_file_pointers(seen_out_dict,seen_out_dat,dataset_path)
-
+    # Get training and validation size:
+    train_size = sum([dataset_classes[label] for label in train_class_ids])
+    valid_size = sum([dataset_classes[label] for label in valid_class_ids])
     # Create the empty tensors
-    #---------------------
-    start_time = time.time()
     train_t = torch.zeros(feature_size,train_size)
     valid_t = torch.zeros(feature_size,valid_size)
-    print ('train_t size', train_t)
     train_semantic_t = torch.zeros(description_size,train_size)
     valid_semantic_t = torch.zeros(description_size,valid_size)
-    print('description_size,train_size', description_size,train_size)
-    print('train_semantic_t size: ', train_semantic_t)
-    print('Create the empty tensors: ', time.time()-start_time)
-
-    # Filling the empty tensors
-    #-----------------------
-    start_time = time.time()
-    seen_train_index = 0
-    seen_valid_index = 0
-    for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
-        feat_out = int(feat_out) - 1 
-        feat_in_split = list(map(float,feat_in.split(',')))
-        if int(feat_out) in train_class_ids:
-            # print("train t size:", train_t[:,seen_train_index].size())
-            # print("train t receiving:", torch.FloatTensor(feat_in_split).size())
-            train_t[:,seen_train_index] = torch.FloatTensor(feat_in_split)
-            train_semantic_t[:,seen_train_index] = seen_attr_mat[feat_out,:]
-            seen_train_index += 1
-        elif int(feat_out) in valid_class_ids:
-            valid_t[:,seen_valid_index] = torch.FloatTensor(feat_in_split)
-            valid_semantic_t[:,seen_valid_index] = seen_attr_mat[feat_out,:]
-            seen_valid_index += 1
-        else:
-            print("Error: class not present in list")
-            exit(1)       
-    print('Filling the empty tensors: ', time.time()-start_time)    
+    # Build the training
+    init_index = 0
+    end_index = 0
+    for fold_index in range(num_folds):
+        if fold_index != index:
+            end_index = init_index+\
+                    sum([dataset_classes[label] for label in splits[fold_index]])
+            train_t[:,range(init_index,end_index)] = splits_t[fold_index]
+            train_semantic_t[:,range(init_index,end_index)] = splits_semantic_t[fold_index]
+            init_index = end_index
+    # Build the validation
+    valid_t[:,:] = splits_t[index]
+    valid_semantic_t[:,:] = splits_semantic_t[index]
+    print('Build the Fold: ', time.time()-start_time)
 
     # Computing A, B, C
     #-------------

@@ -14,7 +14,6 @@ def get_dataset_dict(path, file_reader, dict_name):
        return load_obj(full_dict_name)
     else:
         dataset_dict = {}
-        print(file_reader)
         for feat_out in file_reader:
             key = (int(feat_out)-1)
             if key in dataset_dict:
@@ -22,5 +21,5 @@ def get_dataset_dict(path, file_reader, dict_name):
             else:
                 dataset_dict[key] = 1
         file_reader.close()
-        save_object(dataset_dict,filename)
+        save_object(dataset_dict,full_dict_name)
         return dataset_dict
