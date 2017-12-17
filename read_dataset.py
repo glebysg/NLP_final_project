@@ -5,14 +5,18 @@ import random
 import math
 import argparse
 import torch
-import pickle
 import time
 import numpy as np
 from sklearn.decomposition import PCA
+from helpers import get_dataset_dict, save_object
 
 # Example usage:
 # python read_dataset.py -p ./data/apascal/ -l 500000 -f 10 -r 10f_apascal
 
+
+##########################
+#####   PARSING       ####
+##########################
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--dataset_path",
                     default='./data/apascal/',
@@ -27,9 +31,9 @@ parser.add_argument("-r", "--r_name",
                     required=True,
                     help=("name of the pkl object to save the results"))
 
-def save_object(obj, filename):
-        with open(filename, 'wb') as output:
-                    pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+##########################
+#####   FUNCTION      ####
+##########################
 
 def print_size_info():
     print ('seen_class_ids: ', seen_class_ids.shape)
@@ -48,30 +52,55 @@ def refresh_file_pointers(dict_key,file_name,data_path):
     fid[dict_key].close()
     fid[dict_key] = open(os.path.join(data_path,file_name),'r')
 
+##########################
+#####     INIT        ####
+##########################
+### Arguments
 args = vars(parser.parse_args())
 dataset_path = args['dataset_path']
 lambda_val = args['lambda']
 num_folds = args['folds']
 obj_name = args['r_name']
-#dataset_path = '.\\apascal'
-# dataset_path = '.\\animals'
-#dataset_path = '.\\sun'
+
+### Init Variables
+seen_in_dict = 'seen_input'
+seen_in_dat = 'seen_data_input.dat'
+unseen_in_dict = 'unseen_input'
+unseen_in_dat = 'unseen_data_input.dat'
+seen_out_dict = 'seen_output'
+seen_out_dat = 'seen_data_output.dat'
+unseen_out_dict = 'unseen_output'
+unseen_out_dat = 'unseen_data_output.dat'
+seen_dataset_dict = 'dataset_seen'
+feature_size = 0
 
 fid = {}
 fid_count = {}
 attr_path = os.path.join(dataset_path, 'attr_data.mat')
 data = loadmat(attr_path)
 
-pca_feature_size = 1000
-
 ## Seen Data
+##########################
+####    DATA LOADING  ####
+##########################
+## Load file readers for seen Data
 start_time = time.time()
 seen_class_ids = torch.LongTensor(data['seen_class_ids'])
 seen_attr_mat = torch.FloatTensor(data['seen_attr_mat'])
-fid['seen_input'] = open(os.path.join(dataset_path,'seen_data_input.dat'),'r')
-fid['seen_output'] = open(os.path.join(dataset_path,'seen_data_output.dat'),'r')
+fid[seen_in_dict] = open(os.path.join(dataset_path,seen_in_dat),'r')
+fid[seen_out_dict] = open(os.path.join(dataset_path,seen_out_dat),'r')
 fid_count['seen'] = 0
 print('Seen Data: ', time.time()-start_time)
+
+## Load file readers for unseen Data
+start_time = time.time()
+unseen_class_ids = torch.FloatTensor(data['unseen_class_ids'])
+unseen_attr_mat = torch.FloatTensor(data['unseen_attr_mat'])
+fid[unseen_in_dict] = open(os.path.join(dataset_path,unseen_in_dat),'r')
+fid[unseen_out_dict] = open(os.path.join(dataset_path,unseen_out_dat),'r')
+fid_count['unseen'] = 0
+print('Unseen Data: ', time.time()-start_time)
+
 
 # Find train-validation splits
 start_time = time.time()
@@ -85,31 +114,67 @@ if len(splits[-1]) < num_classes_per_fold:
     del splits[-1]
 print('Find train-validation splits: ', time.time()-start_time)
 
-## Unseen Data
+
+## Load The splits in memory
+## Get the feature size
+for feat_in in fid[seen_in_dict]:
+    feature_size = list(map(float,feat_in.split(',')))
+    feature_size = len(feature_size)
+    break
+print('feature_size: ', feature_size)
+refresh_file_pointers(seen_in_dict,seen_in_dat,dataset_path)
+
+## Create the empty split tensors of the right size
+#-----------------------
 start_time = time.time()
-unseen_class_ids = torch.FloatTensor(data['unseen_class_ids'])
-unseen_attr_mat = torch.FloatTensor(data['unseen_attr_mat'])
-fid['unseen_input'] = open(os.path.join(dataset_path,'unseen_data_input.dat'),'r')
-fid['unseen_output'] = open(os.path.join(dataset_path,'unseen_data_output.dat'),'r')
-fid_count['unseen'] = 0
-print('Unseen Data: ', time.time()-start_time)
-# print('seen_attr_mat: ', seen_attr_mat)
-# print('unseen_attr_mat: ', unseen_attr_mat)
 
-## 
-# For each split in splits: create 
-# split_attr
-# for split in splits:
+dataset_classes = get_dataset_dict(dataset_path,fid[seen_out_dict],seen_dataset_dict)
+refresh_file_pointers(seen_out_dict,seen_out_dat,dataset_path)
+splits_t = []
+splits_semantic_t = []
+description_size = seen_attr_mat.shape[1]
+for split in splits:
+    instance_num = sum([dataset_classes[label] for label in split])
+    split_tensor = torch.zeros(feature_size,instance_num)
+    split_semantic_tensor = torch.zeros(description_size,instance_num)
+    splits_t.append(split_tensor)
+    splits_semantic_t.append(split_semantic_tensor)
+print('Creating the empty split tensors: ', time.time()-start_time)
 
-# exit()
+# Filling the empty tensors
+#-----------------------
+split_index = [0]*num_folds
+start_time = time.time()
+seen_train_index = 0
+seen_valid_index = 0
+for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
+    feat_out = int(feat_out) - 1
+    feat_in_split = list(map(float,feat_in.split(',')))
+    value_asigned = False
+    for index in range(len(splits)):
+        if int(feat_out) in splits[index]:
+            splits_t[index][:,split_index[index]] = torch.FloatTensor(feat_in_split)
+            splits_semantic_t[index][:,split_index[index]] = seen_attr_mat[feat_out,:]
+            split_index[index] += 1
+            value_asigned = True
+            break
+    if not value_asigned:
+        print("ERROR: Class not found in splits")
+        exit(1)
+print('Filling the empty tensors: ', time.time()-start_time)
+refresh_file_pointers(seen_in_dict,seen_in_dat,dataset_path)
+refresh_file_pointers(seen_out_dict,seen_out_dat,dataset_path)
 
-## Count the dimentions of the training and validation folds
 results = {}
 train_accuracy_list =[]
 valid_accuracy_list =[]
 
-# for index in range(len(train_class_ids)):
-for index in range(1):
+##########################
+#####     MAIN        ####
+##########################
+# Go over the folds for tunning
+for index in range(num_folds):
+# for index in range(1):
     # Combine the splits into training and validation
     train_class_ids, valid_class_ids = combine_splits(splits, index)
 
@@ -129,72 +194,31 @@ for index in range(1):
         valid_class_count += 1
     print('Finding training and validation attribute matrix: ', time.time()-start_time)
 
-    #Finding the dataset sizes
+    #Build the splits
     #-------------------
     start_time = time.time()
-    train_size = 0
-    valid_size = 0
-    description_size = seen_attr_mat.shape[1]
-    feature_size = 0
-    train_classes_size = len(train_class_ids)
-    valid_classes_size = len(valid_class_ids)
-    for feat_in in fid['seen_input']:
-        feature_size = list(map(float,feat_in.split(',')))
-        feature_size = len(feature_size)
-        break
-    print('feature_size: ', feature_size)
-    refresh_file_pointers('seen_input','seen_data_input.dat',dataset_path)
-    for feat_out in fid['seen_output']:
-        if (int(feat_out)-1) in train_class_ids:
-            train_size += 1
-        elif (int(feat_out)-1) in valid_class_ids:
-            valid_size += 1
-        else:
-            print("Error: class not present in list")
-            exit(1)
-    print('No. of splits: ', len(splits))
-    print ('No. of train_class_ids: ', len(train_class_ids))
-    print ('No. of valid_class_ids: ', len(valid_class_ids))
-    print('train_size: ', train_size)
-    print('valid_size: ', valid_size)
-    print('Finding the dataset sizes: ', time.time()-start_time)
-
-    refresh_file_pointers('seen_output','seen_data_output.dat',dataset_path)
-
+    # Get training and validation size:
+    train_size = sum([dataset_classes[label] for label in train_class_ids])
+    valid_size = sum([dataset_classes[label] for label in valid_class_ids])
     # Create the empty tensors
-    #---------------------
-    start_time = time.time()
     train_t = torch.zeros(feature_size,train_size)
     valid_t = torch.zeros(feature_size,valid_size)
-    print ('train_t size', train_t.size())
     train_semantic_t = torch.zeros(description_size,train_size)
     valid_semantic_t = torch.zeros(description_size,valid_size)
-    print('description_size,train_size', description_size,train_size)
-    print('train_semantic_t size: ', train_semantic_t.size())
-    print('Create the empty tensors: ', time.time()-start_time)
-
-    # Filling the empty tensors
-    #-----------------------
-    start_time = time.time()
-    seen_train_index = 0
-    seen_valid_index = 0
-    for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
-        feat_out = int(feat_out) - 1 
-        feat_in_split = list(map(float,feat_in.split(',')))
-        if int(feat_out) in train_class_ids:
-            # print("train t size:", train_t[:,seen_train_index].size())
-            # print("train t receiving:", torch.FloatTensor(feat_in_split).size())
-            train_t[:,seen_train_index] = torch.FloatTensor(feat_in_split)
-            train_semantic_t[:,seen_train_index] = seen_attr_mat[feat_out,:]
-            seen_train_index += 1
-        elif int(feat_out) in valid_class_ids:
-            valid_t[:,seen_valid_index] = torch.FloatTensor(feat_in_split)
-            valid_semantic_t[:,seen_valid_index] = seen_attr_mat[feat_out,:]
-            seen_valid_index += 1
-        else:
-            print("Error: class not present in list")
-            exit(1)       
-    print('Filling the empty tensors: ', time.time()-start_time)    
+    # Build the training
+    init_index = 0
+    end_index = 0
+    for fold_index in range(num_folds):
+        if fold_index != index:
+            end_index = init_index+\
+                    sum([dataset_classes[label] for label in splits[fold_index]])
+            train_t[:,range(init_index,end_index)] = splits_t[fold_index]
+            train_semantic_t[:,range(init_index,end_index)] = splits_semantic_t[fold_index]
+            init_index = end_index
+    # Build the validation
+    valid_t[:,:] = splits_t[index]
+    valid_semantic_t[:,:] = splits_semantic_t[index]
+    print('Build the Fold: ', time.time()-start_time)
 
     ## Applying PCA
     #--------------
@@ -273,7 +297,7 @@ exit()
 
 temp = []
 
-for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
+for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
     feat_in = list(map(float,feat_in.split(',')))
     print("Train Feat in",len(feat_in))
     break
@@ -282,7 +306,7 @@ for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
     # exit()
 
 count = 0
-for feat_in, feat_out in zip(fid['seen_input'], fid['seen_output']):
+for feat_in, feat_out in zip(fid[seen_in_dict], fid[seen_out_dict]):
     count += 1
 
 
@@ -290,13 +314,13 @@ print("COUNT TRAIN: ",count)
 
 
 
-for feat_in, feat_out in zip(fid['unseen_input'], fid['unseen_output']):
+for feat_in, feat_out in zip(fid[unseen_in_dict], fid[unseen_out_dict]):
     feat_in = list(map(float,feat_in.split(',')))
     print("Test Feat in",len(feat_in))
     break
 
 count = 0
-for feat_in, feat_out in zip(fid['unseen_input'], fid['unseen_output']):
+for feat_in, feat_out in zip(fid[unseen_in_dict], fid[unseen_out_dict]):
     count += 1
 
 print("COUNT TEST: ",count)
@@ -305,9 +329,9 @@ print("COUNT TEST: ",count)
 
 print_size_info()
 
-fid['seen_input'].close()
-fid['seen_output'].close()
-fid['unseen_input'].close()
-fid['unseen_output'].close()
+fid[seen_in_dict].close()
+fid[seen_out_dict].close()
+fid[unseen_in_dict].close()
+fid[unseen_out_dict].close()
 
 ## W = solve_sylvester(A, B, C)
