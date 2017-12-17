@@ -23,7 +23,7 @@ parser.add_argument("-p", "--dataset_path",
                     default='./data/apascal/',
                     help=("full path to the dataset"))
 parser.add_argument("-l", "--lambda",
-                    default=10000, type=float,
+                    default=500000, type=float,
                     help=("Lamda parameter"))
 parser.add_argument("-r", "--r_name",
                     required=True,
@@ -169,6 +169,7 @@ print('Time taken: ', time.time()-start_time, '\n')
 ## Obtaining inputs to Sylvester
 start_time = time.time()
 print('Obtaining inputs to Sylvester')
+train_t = f.normalize(train_t,p=2,dim=1)
 A = torch.mm(semantic_t,semantic_t.t())
 B = lambda_val*torch.mm(train_t,train_t.t())
 C = (1 + lambda_val)*torch.mm(semantic_t,train_t.t())
@@ -199,7 +200,14 @@ print('Time taken : ', time.time()-start_time, '\n')
 ## Compute testing error
 print('Compute testing error: ')
 start_time = time.time()
+# test_t = f.normalize(test_t,p=2,dim=1)
+
 test_semantic_pred = torch.mm(W, test_t)
+test_semantic_pred = f.normalize(test_semantic_pred,p=2,dim=0)
+
+unseen_attr_mat = f.normalize(unseen_attr_mat,p=2,dim=0)
+unseen_attr_mat = f.normalize(unseen_attr_mat,p=2,dim=1)
+
 _, test_pred_classes = torch.max(torch.mm(unseen_attr_mat, test_semantic_pred), dim=0)
 test_accuracy = torch.sum(test_pred_classes == test_true_classes) / test_pred_classes.numel()
 print('test_accuracy: ', '%.04f'%test_accuracy)
