@@ -24,6 +24,9 @@ parser.add_argument("-p", "--dataset_path",
 parser.add_argument("-l", "--lambda",
                     default=500000, type=float,
                     help=("Lamda parameter"))
+parser.add_argument("-b", "--beta",
+                    default=0.5, type=float,
+                    help=("Beta parameter"))
 parser.add_argument("-f", "--folds",
                     default=10,  type=int,
                     help=("Number of folds for cross validation"))
@@ -176,18 +179,15 @@ full_valid_accuracy_list =[]
 ##########################
 
 # Tune the parameters
-begin_val = 100000.0
-end_val = 900000.0
-exploration_step = 100000.0
+begin_val = 0.001
+end_val = 1
+exploration_step = 0.1
 pivot = begin_val
 best_pivot = pivot
 best_valid_acc = 0.0
 best_W = None
 for tune_step in range(tunning_steps):
     # Go over the folds for tunning
-    print("Begin Val:", begin_val)
-    print("End Val:", end_val)
-    print("pivot:", end_val)
     while(pivot <= end_val):
         train_accuracy_list =[]
         valid_accuracy_list =[]
@@ -242,8 +242,10 @@ for tune_step in range(tunning_steps):
             #-------------
             start_time = time.time()
             A = torch.mm(train_semantic_t,train_semantic_t.t())
-            B = pivot*torch.mm(train_t,train_t.t())
-            C = (1 + pivot)*torch.mm(train_semantic_t,train_t.t())
+            rows, cols = A.size()
+            A = A + torch.ones(rows,cols)*pivot
+            B = lambda_val*torch.mm(train_t,train_t.t())
+            C = (1 + lambda_val)*torch.mm(train_semantic_t,train_t.t())
             # print('Computing A, B, C: ', time.time()-start_time)
 
             # Solving the Sylvester
@@ -288,8 +290,7 @@ for tune_step in range(tunning_steps):
             best_train_acc = np.median(train_accuracy_list)
             best_pivot = pivot
         print("Current Pivot: ", pivot)
-        print("Current acc: ", current_acc)
-        print("Best acc: ", best_valid_acc)
+        print("Current Current acc: ", best_valid_acc)
         full_train_accuracy_list = [pivot] + train_accuracy_list
         full_valid_accuracy_list = [pivot] + valid_accuracy_list
         pivot += exploration_step

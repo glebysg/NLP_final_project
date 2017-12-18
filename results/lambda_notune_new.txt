@@ -1,0 +1,9 @@
+./results_train_test/apascal_pca_results & 0.29 & 0.10 & 0.08 & 
+./results_train_test/apascal_rf_results & 0.40 & 0.07 & 0.02 & 
+./results_train_test/animals_sae_results & 0.63 & 0.85 & 0.84 & 
+./results_train_test/sun_pca_results & 0.07 & 0.13 & 0.10 & 
+./results_train_test/animals_rf_results & 0.17 & 0.10 & 0.07 & 
+./results_train_test/animals_sae_pca_results & 0.63 & 0.62 & 0.59 & 
+./results_train_test/animals_sae_rf_results & 0.63 & 0.84 & 0.83 & 
+./results_train_test/animals_pca_results & 0.12 & 0.09 & 0.06 & 
+./results_train_test/sun_rf_results & 0.06 & 0.12 & 0.08 & 

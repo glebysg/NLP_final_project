@@ -1,0 +1,3 @@
+./results_train_test/animals_sae_rf_5f_lambdaresults & 0.63 & 0.84 & 0.84 & 
+./results_train_test/animals_sae_pca_5f_lambdaresults & 0.62 & 0.58 & 0.54 & 
+./results_train_test/animals_sae_5f_lambdaresults & 0.63 & 0.84 & 0.84 & 

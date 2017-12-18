@@ -25,6 +25,9 @@ parser.add_argument("-p", "--dataset_path",
 parser.add_argument("-l", "--lambda",
                     default=500000, type=float,
                     help=("Lamda parameter"))
+parser.add_argument("-b", "--beta",
+                    default=0, type=float,
+                    help=("Beta parameter"))
 parser.add_argument("-r", "--r_name",
                     required=True,
                     help=("name of the pkl object to save the results"))
@@ -51,6 +54,7 @@ def refresh_file_pointers(dict_key,file_name,data_path):
 args = vars(parser.parse_args())
 dataset_path = args['dataset_path']
 lambda_val = args['lambda']
+beta_val = args['beta']
 obj_name = args['r_name']
 print('Dataset: ', dataset_path)
 
@@ -172,6 +176,9 @@ for feat_in, feat_out in zip(fid[unseen_in_dict], fid[unseen_out_dict]):
 # print('Obtaining inputs to Sylvester')
 train_t = f.normalize(train_t,p=2,dim=1)
 A = torch.mm(semantic_t,semantic_t.t())
+if beta_val > 0.0:
+    rows, cols = A.size()
+    A = A + torch.ones(rows,cols)*beta_val
 B = lambda_val*torch.mm(train_t,train_t.t())
 C = (1 + lambda_val)*torch.mm(semantic_t,train_t.t())
 # print('Time taken: ', time.time()-start_time, '\n')
