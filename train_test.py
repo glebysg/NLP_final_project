@@ -1,6 +1,6 @@
 from scipy.io import loadmat
 from scipy.linalg import solve_sylvester
-import os
+import os, sys
 import random
 import math
 import argparse
